@@ -1,0 +1,77 @@
+/* Cores do sistema: verde escuro e branco */
+:root {
+  --verde: #1f5c3d;
+  --verde-escuro: #174a30;
+  --verde-claro: #edf4ef;
+
+  --bs-primary: #1f5c3d;
+  --bs-primary-rgb: 31, 92, 61;
+  --bs-link-color: #1f5c3d;
+  --bs-link-color-rgb: 31, 92, 61;
+  --bs-link-hover-color: #174a30;
+  --bs-link-hover-color-rgb: 23, 74, 48;
+}
+
+body {
+  background-color: #fff;
+  color: #222;
+}
+
+.btn-primary {
+  --bs-btn-bg: var(--verde);
+  --bs-btn-border-color: var(--verde);
+  --bs-btn-hover-bg: var(--verde-escuro);
+  --bs-btn-hover-border-color: var(--verde-escuro);
+  --bs-btn-active-bg: var(--verde-escuro);
+  --bs-btn-active-border-color: var(--verde-escuro);
+  --bs-btn-disabled-bg: var(--verde);
+  --bs-btn-disabled-border-color: var(--verde);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--verde);
+  --bs-btn-border-color: var(--verde);
+  --bs-btn-hover-bg: var(--verde);
+  --bs-btn-hover-border-color: var(--verde);
+  --bs-btn-active-bg: var(--verde-escuro);
+  --bs-btn-active-border-color: var(--verde-escuro);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--verde);
+  box-shadow: 0 0 0 0.2rem rgba(31, 92, 61, 0.15);
+}
+
+/* Barra de navegação */
+.navbar-sistema {
+  background-color: var(--verde);
+  background-image: linear-gradient(90deg, #143d28 0%, var(--verde) 55%, #2d7a52 100%);
+}
+
+.navbar-sistema .nav-link.active {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+/* Tabelas */
+.table thead th {
+  border-bottom: 2px solid var(--verde);
+  font-weight: 600;
+}
+
+/* Grade semanal */
+.grade th,
+.grade td {
+  width: 14%;
+}
+
+.grade td {
+  height: 90px;
+  vertical-align: top;
+}
+
+.grade td.ocupado {
+  background-color: var(--verde-claro);
+}
