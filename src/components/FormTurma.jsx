@@ -9,8 +9,25 @@ const formularioVazio = {
   vagas: '',
 }
 
-function FormTurma({ disciplinas, professores, onSalvar }) {
-  const [formulario, setFormulario] = useState(formularioVazio)
+function formularioDaTurma(turma) {
+  if (!turma) {
+    return formularioVazio
+  }
+
+  return {
+    disciplinaId: String(turma.disciplinaId),
+    professorId: String(turma.professorId),
+    dia: turma.horario[0],
+    turno: turma.horario[1],
+    vagas: String(turma.vagas),
+  }
+}
+
+// Sem "turma": cadastra uma nova. Com "turma": edita a turma recebida.
+// Quem usa o componente deve passar uma "key" diferente para cada turma editada.
+function FormTurma({ disciplinas, professores, turma = null, onSalvar, onCancelar }) {
+  const [formulario, setFormulario] = useState(() => formularioDaTurma(turma))
+  const editando = turma !== null
 
   function alterarCampo(evento) {
     const { name, value } = evento.target
@@ -27,7 +44,7 @@ function FormTurma({ disciplinas, professores, onSalvar }) {
       vagas: Number(formulario.vagas),
     })
 
-    if (!erro) {
+    if (!erro && !editando) {
       setFormulario(formularioVazio)
     }
   }
@@ -118,7 +135,14 @@ function FormTurma({ disciplinas, professores, onSalvar }) {
         />
       </div>
 
-      <button type="submit" className="btn btn-primary">Cadastrar turma</button>
+      <button type="submit" className="btn btn-primary">
+        {editando ? 'Salvar alterações' : 'Cadastrar turma'}
+      </button>
+      {editando && (
+        <button type="button" className="btn btn-outline-secondary ms-2" onClick={onCancelar}>
+          Cancelar
+        </button>
+      )}
     </form>
   )
 }

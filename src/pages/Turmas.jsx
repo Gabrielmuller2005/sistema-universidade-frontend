@@ -1,7 +1,15 @@
 import { useState } from 'react'
+import Alerta from '../components/Alerta.jsx'
+import ConfirmModal from '../components/ConfirmModal.jsx'
 import FormTurma from '../components/FormTurma.jsx'
 import { useDados } from '../context/DadosContext.jsx'
 import { textoHorario } from '../utils/horario.js'
+
+function textoAlunos(quantidade) {
+  return quantidade === 1
+    ? '1 aluno matriculado perderá a matrícula'
+    : `${quantidade} alunos matriculados perderão a matrícula`
+}
 
 function Turmas() {
   const {
@@ -11,38 +19,76 @@ function Turmas() {
     buscarDisciplina,
     buscarProfessor,
     contarVagasLivres,
+    contarMatriculas,
     adicionarTurma,
+    editarTurma,
     removerTurma,
+    restaurarDadosIniciais,
   } = useDados()
   const [mensagem, setMensagem] = useState(null)
+  const [turmaEmEdicao, setTurmaEmEdicao] = useState(null)
+  const [turmaParaRemover, setTurmaParaRemover] = useState(null)
+  const [restaurando, setRestaurando] = useState(false)
 
-  function salvarTurma(novaTurma) {
-    const erro = adicionarTurma(novaTurma)
+  function salvarTurma(dados) {
+    const erro = turmaEmEdicao ? editarTurma(turmaEmEdicao.id, dados) : adicionarTurma(dados)
 
     if (erro) {
       setMensagem({ tipo: 'danger', texto: erro })
     } else {
-      setMensagem({ tipo: 'success', texto: 'Turma cadastrada.' })
+      setMensagem({ tipo: 'success', texto: turmaEmEdicao ? 'Turma atualizada.' : 'Turma cadastrada.' })
+      setTurmaEmEdicao(null)
     }
 
     return erro
   }
 
-  function excluirTurma(turmaId) {
-    removerTurma(turmaId)
+  function confirmarRemocao() {
+    removerTurma(turmaParaRemover.id)
+    if (turmaEmEdicao && turmaEmEdicao.id === turmaParaRemover.id) {
+      setTurmaEmEdicao(null)
+    }
+    setTurmaParaRemover(null)
     setMensagem({ tipo: 'success', texto: 'Turma removida.' })
+  }
+
+  function confirmarRestauracao() {
+    restaurarDadosIniciais()
+    setTurmaEmEdicao(null)
+    setRestaurando(false)
+    setMensagem({ tipo: 'success', texto: 'Dados de exemplo restaurados.' })
+  }
+
+  function textoRemocao() {
+    const nome = buscarDisciplina(turmaParaRemover.disciplinaId).nome
+    const horario = textoHorario(turmaParaRemover.horario)
+    const matriculados = contarMatriculas(turmaParaRemover)
+
+    if (matriculados === 0) {
+      return `Remover a turma de ${nome} (${horario})?`
+    }
+    return `Remover a turma de ${nome} (${horario})? ${textoAlunos(matriculados)}.`
   }
 
   return (
     <>
       <h1 className="h4 mb-4">Turmas ofertadas</h1>
 
-      {mensagem && <div className={`alert alert-${mensagem.tipo}`}>{mensagem.texto}</div>}
+      <Alerta mensagem={mensagem} onFechar={() => setMensagem(null)} />
 
       <div className="row g-5">
         <div className="col-lg-4">
-          <h2 className="h6 text-uppercase text-secondary mb-3">Nova turma</h2>
-          <FormTurma disciplinas={disciplinas} professores={professores} onSalvar={salvarTurma} />
+          <h2 className="h6 text-uppercase text-secondary mb-3">
+            {turmaEmEdicao ? 'Editar turma' : 'Nova turma'}
+          </h2>
+          <FormTurma
+            key={turmaEmEdicao ? turmaEmEdicao.id : 'nova'}
+            disciplinas={disciplinas}
+            professores={professores}
+            turma={turmaEmEdicao}
+            onSalvar={salvarTurma}
+            onCancelar={() => setTurmaEmEdicao(null)}
+          />
         </div>
 
         <div className="col-lg-8">
@@ -50,7 +96,7 @@ function Turmas() {
             <p className="text-secondary">Nenhuma turma cadastrada.</p>
           ) : (
             <div className="table-responsive">
-              <table className="table align-middle">
+              <table className="table table-hover align-middle">
                 <thead>
                   <tr>
                     <th>Disciplina</th>
@@ -62,15 +108,24 @@ function Turmas() {
                 </thead>
                 <tbody>
                   {turmas.map((turma) => (
-                    <tr key={turma.id}>
+                    <tr
+                      key={turma.id}
+                      className={turmaEmEdicao && turmaEmEdicao.id === turma.id ? 'table-active' : ''}
+                    >
                       <td>{buscarDisciplina(turma.disciplinaId).nome}</td>
                       <td>{buscarProfessor(turma.professorId).nome}</td>
                       <td>{textoHorario(turma.horario)}</td>
                       <td>{contarVagasLivres(turma)} de {turma.vagas}</td>
-                      <td className="text-end">
+                      <td className="text-end text-nowrap">
+                        <button
+                          className="btn btn-sm btn-outline-primary me-2"
+                          onClick={() => setTurmaEmEdicao(turma)}
+                        >
+                          Editar
+                        </button>
                         <button
                           className="btn btn-sm btn-outline-danger"
-                          onClick={() => excluirTurma(turma.id)}
+                          onClick={() => setTurmaParaRemover(turma)}
                         >
                           Remover
                         </button>
@@ -81,8 +136,35 @@ function Turmas() {
               </table>
             </div>
           )}
+
+          <button
+            className="btn btn-link btn-sm text-secondary p-0 mt-3"
+            onClick={() => setRestaurando(true)}
+          >
+            Restaurar dados de exemplo
+          </button>
         </div>
       </div>
+
+      {turmaParaRemover && (
+        <ConfirmModal
+          titulo="Remover turma"
+          texto={textoRemocao()}
+          textoConfirmar="Remover"
+          onConfirmar={confirmarRemocao}
+          onCancelar={() => setTurmaParaRemover(null)}
+        />
+      )}
+
+      {restaurando && (
+        <ConfirmModal
+          titulo="Restaurar dados de exemplo"
+          texto="Todas as turmas e matrículas voltarão ao estado inicial. Deseja continuar?"
+          textoConfirmar="Restaurar"
+          onConfirmar={confirmarRestauracao}
+          onCancelar={() => setRestaurando(false)}
+        />
+      )}
     </>
   )
 }
