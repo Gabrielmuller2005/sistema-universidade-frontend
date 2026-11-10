@@ -1,15 +1,19 @@
 // Guarda quem está logado: o perfil ('instituicao' ou 'aluno') e o usuário.
+// A sessão fica salva na aba do navegador: recarregar a página não desloga,
+// mas fechar a aba sim.
 
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext } from 'react'
+import { useArmazenamento } from '../hooks/useArmazenamento.js'
 import { useDados } from './DadosContext.jsx'
 
 const SessaoContext = createContext(null)
 
 export function SessaoProvider({ children }) {
-  const { autenticar } = useDados()
-  const [perfil, setPerfil] = useState(null)
-  const [usuario, setUsuario] = useState(null)
+  const { autenticar, buscarUsuario } = useDados()
+  const [sessao, setSessao] = useArmazenamento('su:sessao', null, window.sessionStorage)
 
+  const usuario = sessao ? buscarUsuario(sessao.perfil, sessao.usuarioId) : null
+  const perfil = usuario ? sessao.perfil : null
   const alunoLogado = perfil === 'aluno' ? usuario : null
 
   // Devolve a mensagem de erro ou null se o login deu certo.
@@ -20,14 +24,12 @@ export function SessaoProvider({ children }) {
       return 'Login ou senha inválidos.'
     }
 
-    setPerfil(perfilEscolhido)
-    setUsuario(encontrado)
+    setSessao({ perfil: perfilEscolhido, usuarioId: encontrado.id })
     return null
   }
 
   function sair() {
-    setPerfil(null)
-    setUsuario(null)
+    setSessao(null)
   }
 
   const valor = { perfil, usuario, alunoLogado, entrar, sair }

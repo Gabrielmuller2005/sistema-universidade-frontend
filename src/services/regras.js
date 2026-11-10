@@ -17,8 +17,11 @@ export function cumprePreRequisito(disciplina, aluno) {
   return aluno.disciplinasAprovadas.includes(disciplina.preRequisitoId)
 }
 
-export function validarCargaProfessor(novaTurma, turmas) {
-  const turmasDoProfessor = turmas.filter((t) => t.professorId === novaTurma.professorId)
+// ignorarTurmaId: usado na edição, para a própria turma não contar contra o professor.
+export function validarCargaProfessor(novaTurma, turmas, ignorarTurmaId = null) {
+  const turmasDoProfessor = turmas.filter(
+    (t) => t.professorId === novaTurma.professorId && t.id !== ignorarTurmaId,
+  )
 
   if (turmasDoProfessor.length >= LIMITE_TURMAS_PROFESSOR) {
     return `Este professor já possui ${LIMITE_TURMAS_PROFESSOR} turmas.`
@@ -26,6 +29,43 @@ export function validarCargaProfessor(novaTurma, turmas) {
 
   if (turmasDoProfessor.some((t) => t.horario === novaTurma.horario)) {
     return `Este professor já possui uma turma em ${textoHorario(novaTurma.horario)}.`
+  }
+
+  return null
+}
+
+// Valida a edição de uma turma que já existe (turmaEditada traz o id).
+export function validarEdicaoTurma(turmaEditada, turmas, matriculas) {
+  const erroCarga = validarCargaProfessor(turmaEditada, turmas, turmaEditada.id)
+  if (erroCarga) {
+    return erroCarga
+  }
+
+  const original = turmas.find((t) => t.id === turmaEditada.id)
+  const matriculasDaTurma = matriculas.filter((m) => m.turmaId === turmaEditada.id)
+
+  if (turmaEditada.vagas < matriculasDaTurma.length) {
+    return `Esta turma já tem ${matriculasDaTurma.length} aluno(s) matriculado(s). As vagas não podem ser menores que isso.`
+  }
+
+  if (matriculasDaTurma.length > 0 && original.disciplinaId !== turmaEditada.disciplinaId) {
+    return 'Não é possível trocar a disciplina de uma turma que já tem alunos matriculados.'
+  }
+
+  if (original.horario !== turmaEditada.horario) {
+    const alunoComConflito = matriculasDaTurma.some((m) =>
+      matriculas.some((outra) => {
+        if (outra.alunoId !== m.alunoId || outra.turmaId === turmaEditada.id) {
+          return false
+        }
+        const outraTurma = turmas.find((t) => t.id === outra.turmaId)
+        return outraTurma.horario === turmaEditada.horario
+      }),
+    )
+
+    if (alunoComConflito) {
+      return `Não é possível mudar para ${textoHorario(turmaEditada.horario)}: um aluno matriculado já tem outra turma nesse horário.`
+    }
   }
 
   return null
