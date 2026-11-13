@@ -27,6 +27,7 @@ function formularioDaTurma(turma) {
 // Quem usa o componente deve passar uma "key" diferente para cada turma editada.
 function FormTurma({ disciplinas, professores, turma = null, onSalvar, onCancelar }) {
   const [formulario, setFormulario] = useState(() => formularioDaTurma(turma))
+  const [salvando, setSalvando] = useState(false)
   const editando = turma !== null
 
   function alterarCampo(evento) {
@@ -34,15 +35,18 @@ function FormTurma({ disciplinas, professores, turma = null, onSalvar, onCancela
     setFormulario({ ...formulario, [name]: value })
   }
 
-  function enviar(evento) {
+  async function enviar(evento) {
     evento.preventDefault()
+    setSalvando(true)
 
-    const erro = onSalvar({
+    const erro = await onSalvar({
       disciplinaId: Number(formulario.disciplinaId),
       professorId: Number(formulario.professorId),
       horario: formulario.dia + formulario.turno,
       vagas: Number(formulario.vagas),
     })
+
+    setSalvando(false)
 
     if (!erro && !editando) {
       setFormulario(formularioVazio)
@@ -135,8 +139,8 @@ function FormTurma({ disciplinas, professores, turma = null, onSalvar, onCancela
         />
       </div>
 
-      <button type="submit" className="btn btn-primary">
-        {editando ? 'Salvar alterações' : 'Cadastrar turma'}
+      <button type="submit" className="btn btn-primary" disabled={salvando}>
+        {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Cadastrar turma'}
       </button>
       {editando && (
         <button type="button" className="btn btn-outline-secondary ms-2" onClick={onCancelar}>

@@ -4,28 +4,26 @@
 
 import { createContext, useContext } from 'react'
 import { useArmazenamento } from '../hooks/useArmazenamento.js'
-import { useDados } from './DadosContext.jsx'
+import { login } from '../services/api.js'
 
 const SessaoContext = createContext(null)
 
 export function SessaoProvider({ children }) {
-  const { autenticar, buscarUsuario } = useDados()
   const [sessao, setSessao] = useArmazenamento('su:sessao', null, window.sessionStorage)
 
-  const usuario = sessao ? buscarUsuario(sessao.perfil, sessao.usuarioId) : null
-  const perfil = usuario ? sessao.perfil : null
+  const usuario = sessao
+  const perfil = sessao?.perfil ?? null
   const alunoLogado = perfil === 'aluno' ? usuario : null
 
   // Devolve a mensagem de erro ou null se o login deu certo.
-  function entrar(perfilEscolhido, login, senha) {
-    const encontrado = autenticar(perfilEscolhido, login, senha)
-
-    if (!encontrado) {
-      return 'Login ou senha inválidos.'
+  async function entrar(perfilEscolhido, loginUsuario, senha) {
+    try {
+      const encontrado = await login(perfilEscolhido, loginUsuario, senha)
+      setSessao(encontrado)
+      return null
+    } catch (erro) {
+      return erro.message
     }
-
-    setSessao({ perfil: perfilEscolhido, usuarioId: encontrado.id })
-    return null
   }
 
   function sair() {

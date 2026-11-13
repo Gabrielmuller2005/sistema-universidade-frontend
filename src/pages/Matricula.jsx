@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Alerta from '../components/Alerta.jsx'
 import { useDados } from '../context/DadosContext.jsx'
 import { useSessao } from '../context/SessaoContext.jsx'
@@ -12,66 +12,109 @@ function normalizar(texto) {
 function Matricula() {
   const {
     turmas,
+    carregando,
+    erro,
     buscarDisciplina,
-    buscarProfessor,
     contarVagasLivres,
     turmasDoAluno,
     verificarMatricula,
     matricular,
   } = useDados()
   const { alunoLogado } = useSessao()
+  const alunoId = alunoLogado?.id
   const [mensagem, setMensagem] = useState(null)
   const [busca, setBusca] = useState('')
   const [dia, setDia] = useState('')
   const [apenasDisponiveis, setApenasDisponiveis] = useState(false)
+  const [minhasTurmas, setMinhasTurmas] = useState(null)
+  const [situacoes, setSituacoes] = useState(null)
+  const [matriculandoId, setMatriculandoId] = useState(null)
 
-  const minhasTurmas = turmasDoAluno(alunoLogado.id)
+  const carregarSituacoes = useCallback(async () => {
+    if (!alunoId) {
+      return
+    }
 
-  function fazerMatricula(turmaId) {
-    const erro = matricular(alunoLogado.id, turmaId)
+    const minhas = await turmasDoAluno(alunoId)
+    const idsMatriculados = new Set(minhas.map((turma) => turma.id))
+    const pares = await Promise.all(
+      turmas
+        .filter((turma) => !idsMatriculados.has(turma.id))
+        .map(async (turma) => [turma.id, await verificarMatricula(alunoId, turma.id)]),
+    )
 
-    if (erro) {
-      setMensagem({ tipo: 'danger', texto: erro })
+    setMinhasTurmas(minhas)
+    setSituacoes(new Map(pares))
+  }, [alunoId, turmas, turmasDoAluno, verificarMatricula])
+
+  useEffect(() => {
+    let ativo = true
+
+    async function carregar() {
+      try {
+        await carregarSituacoes()
+      } catch (excecao) {
+        if (ativo) {
+          setMensagem({ tipo: 'danger', texto: excecao.message })
+        }
+      }
+    }
+
+    carregar()
+
+    return () => {
+      ativo = false
+    }
+  }, [carregarSituacoes])
+
+  async function fazerMatricula(turmaId) {
+    setMatriculandoId(turmaId)
+    const erroApi = await matricular(alunoId, turmaId)
+
+    if (erroApi) {
+      setMensagem({ tipo: 'danger', texto: erroApi })
     } else {
       setMensagem({ tipo: 'success', texto: 'Matrícula realizada.' })
+      await carregarSituacoes()
     }
-  }
 
-  function nomePreRequisito(disciplina) {
-    if (!disciplina.preRequisitoId) {
-      return '-'
-    }
-    return buscarDisciplina(disciplina.preRequisitoId).nome
+    setMatriculandoId(null)
   }
 
   // Situação do aluno em relação a cada turma: matriculado, bloqueado (com motivo) ou livre.
   function situacaoDaTurma(turma) {
+    if (!situacoes || !minhasTurmas) {
+      return { tipo: 'verificando' }
+    }
+
     if (minhasTurmas.some((t) => t.id === turma.id)) {
       return { tipo: 'matriculado' }
     }
 
-    const motivo = verificarMatricula(alunoLogado.id, turma.id)
-    return motivo ? { tipo: 'bloqueada', motivo } : { tipo: 'livre' }
+    const verificacao = situacoes.get(turma.id)
+    return verificacao && !verificacao.podeMatricular
+      ? { tipo: 'bloqueada', motivo: verificacao.motivo }
+      : { tipo: 'livre' }
   }
 
   const linhas = turmas
-    .map((turma) => ({
-      turma,
-      disciplina: buscarDisciplina(turma.disciplinaId),
-      professor: buscarProfessor(turma.professorId),
-      situacao: situacaoDaTurma(turma),
-    }))
-    .filter(({ turma, disciplina, professor, situacao }) => {
+    .map((turma) => ({ turma, situacao: situacaoDaTurma(turma) }))
+    .filter(({ turma, situacao }) => {
       const textoBusca = normalizar(busca.trim())
       const combinaBusca =
         textoBusca === '' ||
-        normalizar(disciplina.nome).includes(textoBusca) ||
-        normalizar(professor.nome).includes(textoBusca)
+        normalizar(turma.disciplinaNome).includes(textoBusca) ||
+        normalizar(turma.professorNome).includes(textoBusca)
       const combinaDia = dia === '' || turma.horario[0] === dia
       const combinaDisponibilidade = !apenasDisponiveis || situacao.tipo === 'livre'
 
       return combinaBusca && combinaDia && combinaDisponibilidade
     })
+
+  function nomePreRequisito(turma) {
+    const disciplina = buscarDisciplina(turma.disciplinaId)
+    return disciplina?.preRequisitoNome ?? '-'
+  }
 
   const temFiltro = busca !== '' || dia !== '' || apenasDisponiveis
 
@@ -79,6 +122,14 @@ function Matricula() {
     setBusca('')
     setDia('')
     setApenasDisponiveis(false)
+  }
+
+  if (carregando) {
+    return <p className="text-secondary">Carregando dados...</p>
+  }
+
+  if (erro) {
+    return <div className="alert alert-danger">{erro}</div>
   }
 
   return (
@@ -157,11 +208,11 @@ function Matricula() {
                   </tr>
                 </thead>
                 <tbody>
-                  {linhas.map(({ turma, disciplina, professor, situacao }) => (
+                  {linhas.map(({ turma, situacao }) => (
                     <tr key={turma.id}>
-                      <td>{disciplina.nome}</td>
-                      <td>{nomePreRequisito(disciplina)}</td>
-                      <td>{professor.nome}</td>
+                      <td>{turma.disciplinaNome}</td>
+                      <td>{nomePreRequisito(turma)}</td>
+                      <td>{turma.professorNome}</td>
                       <td>{textoHorario(turma.horario)}</td>
                       <td>{contarVagasLivres(turma)}</td>
                       <td>
@@ -174,15 +225,18 @@ function Matricula() {
                         {situacao.tipo === 'bloqueada' && (
                           <span className="small text-danger">{situacao.motivo}</span>
                         )}
+                        {situacao.tipo === 'verificando' && (
+                          <span className="small text-secondary">Verificando...</span>
+                        )}
                       </td>
                       <td className="text-end">
-                        {situacao.tipo !== 'matriculado' && (
+                        {situacao.tipo === 'livre' && (
                           <button
                             className="btn btn-sm btn-primary"
-                            disabled={situacao.tipo === 'bloqueada'}
+                            disabled={matriculandoId === turma.id}
                             onClick={() => fazerMatricula(turma.id)}
                           >
-                            Matricular
+                            {matriculandoId === turma.id ? 'Matriculando...' : 'Matricular'}
                           </button>
                         )}
                       </td>
