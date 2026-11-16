@@ -16,8 +16,8 @@ function Turmas() {
     turmas,
     disciplinas,
     professores,
-    buscarDisciplina,
-    buscarProfessor,
+    carregando,
+    erro,
     contarVagasLivres,
     contarMatriculas,
     adicionarTurma,
@@ -30,44 +30,62 @@ function Turmas() {
   const [turmaParaRemover, setTurmaParaRemover] = useState(null)
   const [restaurando, setRestaurando] = useState(false)
 
-  function salvarTurma(dados) {
-    const erro = turmaEmEdicao ? editarTurma(turmaEmEdicao.id, dados) : adicionarTurma(dados)
+  async function salvarTurma(dados) {
+    const erroApi = turmaEmEdicao
+      ? await editarTurma(turmaEmEdicao.id, dados)
+      : await adicionarTurma(dados)
 
-    if (erro) {
-      setMensagem({ tipo: 'danger', texto: erro })
-    } else {
-      setMensagem({ tipo: 'success', texto: turmaEmEdicao ? 'Turma atualizada.' : 'Turma cadastrada.' })
-      setTurmaEmEdicao(null)
+    if (erroApi) {
+      setMensagem({ tipo: 'danger', texto: erroApi })
+      return erroApi
     }
 
-    return erro
+    setMensagem({ tipo: 'success', texto: turmaEmEdicao ? 'Turma atualizada.' : 'Turma cadastrada.' })
+    setTurmaEmEdicao(null)
+    return null
   }
 
-  function confirmarRemocao() {
-    removerTurma(turmaParaRemover.id)
+  async function confirmarRemocao() {
+    const erroApi = await removerTurma(turmaParaRemover.id)
+
     if (turmaEmEdicao && turmaEmEdicao.id === turmaParaRemover.id) {
       setTurmaEmEdicao(null)
     }
     setTurmaParaRemover(null)
-    setMensagem({ tipo: 'success', texto: 'Turma removida.' })
+    setMensagem(
+      erroApi
+        ? { tipo: 'danger', texto: erroApi }
+        : { tipo: 'success', texto: 'Turma removida.' },
+    )
   }
 
-  function confirmarRestauracao() {
-    restaurarDadosIniciais()
+  async function confirmarRestauracao() {
+    const erroApi = await restaurarDadosIniciais()
     setTurmaEmEdicao(null)
     setRestaurando(false)
-    setMensagem({ tipo: 'success', texto: 'Dados de exemplo restaurados.' })
+    setMensagem(
+      erroApi
+        ? { tipo: 'danger', texto: erroApi }
+        : { tipo: 'success', texto: 'Dados de exemplo restaurados.' },
+    )
   }
 
   function textoRemocao() {
-    const nome = buscarDisciplina(turmaParaRemover.disciplinaId).nome
     const horario = textoHorario(turmaParaRemover.horario)
     const matriculados = contarMatriculas(turmaParaRemover)
 
     if (matriculados === 0) {
-      return `Remover a turma de ${nome} (${horario})?`
+      return `Remover a turma de ${turmaParaRemover.disciplinaNome} (${horario})?`
     }
-    return `Remover a turma de ${nome} (${horario})? ${textoAlunos(matriculados)}.`
+    return `Remover a turma de ${turmaParaRemover.disciplinaNome} (${horario})? ${textoAlunos(matriculados)}.`
+  }
+
+  if (carregando) {
+    return <p className="text-secondary">Carregando dados...</p>
+  }
+
+  if (erro) {
+    return <div className="alert alert-danger">{erro}</div>
   }
 
   return (
@@ -112,8 +130,8 @@ function Turmas() {
                       key={turma.id}
                       className={turmaEmEdicao && turmaEmEdicao.id === turma.id ? 'table-active' : ''}
                     >
-                      <td>{buscarDisciplina(turma.disciplinaId).nome}</td>
-                      <td>{buscarProfessor(turma.professorId).nome}</td>
+                      <td>{turma.disciplinaNome}</td>
+                      <td>{turma.professorNome}</td>
                       <td>{textoHorario(turma.horario)}</td>
                       <td>{contarVagasLivres(turma)} de {turma.vagas}</td>
                       <td className="text-end text-nowrap">

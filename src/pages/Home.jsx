@@ -13,6 +13,7 @@ function Home() {
   const [login, setLogin] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState(null)
+  const [entrando, setEntrando] = useState(false)
 
   if (sessao.perfil) {
     return <Navigate to={paginaInicial[sessao.perfil]} />
@@ -25,9 +26,11 @@ function Home() {
     setErro(null)
   }
 
-  function enviar(evento) {
+  async function enviar(evento) {
     evento.preventDefault()
-    setErro(sessao.entrar(perfil, login, senha))
+    setEntrando(true)
+    setErro(await sessao.entrar(perfil, login, senha))
+    setEntrando(false)
   }
 
   return (
@@ -82,7 +85,9 @@ function Home() {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary w-100">Entrar</button>
+            <button type="submit" className="btn btn-primary w-100" disabled={entrando}>
+              {entrando ? 'Entrando...' : 'Entrar'}
+            </button>
           </form>
         </div>
       </div>
